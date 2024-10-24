@@ -5,6 +5,7 @@ import numpy as np
 from flask_cors import CORS
 from PIL import Image
 import io
+import os
 import base64
 
 app = Flask(__name__)
