@@ -8,6 +8,10 @@ import io
 import base64
 import os
 
+# Suppress TensorFlow CUDA and CPU warnings
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable CUDA (GPU)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress non-error CPU warnings
+
 app = Flask(__name__)
 CORS(app)
 
