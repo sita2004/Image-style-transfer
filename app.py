@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
-from flask_cors import CORS
 from PIL import Image
 import io
 import base64
@@ -15,8 +16,16 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Only log errors
 # Disable GPU initialization at TensorFlow level
 tf.config.set_visible_devices([], 'GPU')
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust allowed origins as needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load the TensorFlow Hub model
 hub_handle = 'https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2'
@@ -30,32 +39,29 @@ def load_and_process_image(image_data, image_size=(256, 256)):
     if img.mode != 'RGB':
         img = img.convert('RGB')
     
-    # Convert to TensorFlow tensor, resize and normalize
+    # Convert to TensorFlow tensor, resize, and normalize
     img = tf.convert_to_tensor(np.array(img))
     img = tf.image.resize(img, image_size)
     img = tf.expand_dims(img, 0) / 255.0  # Normalize to [0, 1]
     return img
 
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({"message": "Welcome to the Image Style Transfer API!"})
+@app.get("/")
+async def home():
+    return JSONResponse(content={"message": "Welcome to the Image Style Transfer API!"})
 
-@app.route('/stylize', methods=['POST'])
-def stylize():
+@app.post("/stylize")
+async def stylize(content_image: UploadFile = File(...), style_image: UploadFile = File(...)):
     try:
-        # Ensure files are provided
-        if 'content_image' not in request.files or 'style_image' not in request.files:
-            return jsonify({"error": "Both content_image and style_image must be provided."}), 400
-
-        content_image_data = request.files['content_image'].read()
-        style_image_data = request.files['style_image'].read()
+        # Read content and style images
+        content_image_data = await content_image.read()
+        style_image_data = await style_image.read()
 
         # Process content and style images
-        content_image = load_and_process_image(content_image_data)
-        style_image = load_and_process_image(style_image_data)
+        content_image_tensor = load_and_process_image(content_image_data)
+        style_image_tensor = load_and_process_image(style_image_data)
 
         # Perform stylization
-        stylized_image = hub_module(tf.constant(content_image), tf.constant(style_image))[0]
+        stylized_image = hub_module(tf.constant(content_image_tensor), tf.constant(style_image_tensor))[0]
 
         # Convert tensor back to image format
         stylized_image = np.squeeze(stylized_image) * 255
@@ -68,12 +74,10 @@ def stylize():
         img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
         # Return JSON with base64-encoded image
-        return jsonify({'stylized_image': img_base64})
+        return JSONResponse(content={'stylized_image': img_base64})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500  # Handle unexpected errors
+        raise HTTPException(status_code=500, detail=str(e))  # Handle unexpected errors
 
-# Set the app to run on the assigned port in deployment
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+# Run the FastAPI application with Uvicorn for deployment
+# In a production environment, run using: `uvicorn app:app --host 0.0.0.0 --port 5000`
