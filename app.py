@@ -8,9 +8,12 @@ import io
 import base64
 import os
 
-# Suppress TensorFlow CUDA and CPU warnings
+# Disable GPU and suppress TensorFlow non-error logs
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Disable CUDA (GPU)
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress non-error CPU warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Only log errors
+
+# Disable GPU initialization at TensorFlow level
+tf.config.set_visible_devices([], 'GPU')
 
 app = Flask(__name__)
 CORS(app)
