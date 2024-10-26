@@ -6,15 +6,14 @@ import numpy as np
 from PIL import Image
 import io
 import base64
-import os
 
 app = FastAPI()
 
-# Load the TensorFlow Hub model
-hub_handle = 'https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2'
-hub_module = hub.load(hub_handle)
+# Function to load TensorFlow Hub model only when needed
+def load_model():
+    return hub.load("https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2")
 
-# Process and load the image data
+# Function to process and load image data for model input
 def load_and_process_image(image_data, image_size=(256, 256)):
     img = Image.open(io.BytesIO(image_data))
     if img.mode != 'RGB':
@@ -31,7 +30,7 @@ async def home():
 @app.post("/stylize")
 async def stylize(content_image: UploadFile = File(...), style_image: UploadFile = File(...)):
     try:
-        # Read images from request
+        # Read images from the request
         content_image_data = await content_image.read()
         style_image_data = await style_image.read()
 
@@ -39,11 +38,12 @@ async def stylize(content_image: UploadFile = File(...), style_image: UploadFile
         if not content_image_data or not style_image_data:
             raise HTTPException(status_code=400, detail="Both content_image and style_image must be provided.")
 
-        # Process images for model input
+        # Load and process images for model input
         content_image_tensor = load_and_process_image(content_image_data)
         style_image_tensor = load_and_process_image(style_image_data)
 
-        # Apply style transfer
+        # Load model and apply style transfer
+        hub_module = load_model()
         stylized_image = hub_module(tf.constant(content_image_tensor), tf.constant(style_image_tensor))[0]
 
         # Convert tensor back to image format
@@ -52,15 +52,14 @@ async def stylize(content_image: UploadFile = File(...), style_image: UploadFile
 
         # Convert to base64 for JSON response
         buf = io.BytesIO()
-        stylized_image.save(buf, format='PNG')
+        stylized_image.save(buf, format="PNG")
         buf.seek(0)
-        img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        img_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
         # Send JSON response with base64-encoded image
-        return JSONResponse(content={'stylized_image': img_base64})
+        return JSONResponse(content={"stylized_image": img_base64})
 
     except HTTPException as e:
         raise e
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
-
