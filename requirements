@@ -1,7 +1,7 @@
-Flask
-Flask-CORS
+fastapi
+uvicorn
 tensorflow
 tensorflow_hub
 numpy
 pillow
-gunicorn
+python-multipart
