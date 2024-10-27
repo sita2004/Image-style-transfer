@@ -1,7 +1,7 @@
+tensorflow==2.12.0  # or your chosen version
+tensorflow-hub
 fastapi
 uvicorn
-tensorflow==2.12.0
-tensorflow_hub
+Pillow
 numpy
-pillow
-python-multipart
+python-multipart  # Add this line
