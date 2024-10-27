@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load the TensorFlow Hub model
+# Load the TensorFlow Hub model once
 hub_handle = 'https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2'
 hub_module = hub.load(hub_handle)
 
@@ -28,10 +28,10 @@ def load_and_process_image(image_data, image_size=(256, 256)):
     img = Image.open(io.BytesIO(image_data))
     if img.mode != 'RGB':
         img = img.convert('RGB')
-    img = tf.convert_to_tensor(np.array(img))
-    img = tf.image.resize(img, image_size)
-    img = tf.expand_dims(img, 0) / 255.0  # Normalize to [0, 1]
-    return img
+    img = img.resize(image_size, Image.ANTIALIAS)  # Efficient resizing
+    img = np.array(img) / 255.0  # Normalize to [0, 1]
+    img_tensor = tf.convert_to_tensor(img, dtype=tf.float32)
+    return tf.expand_dims(img_tensor, 0)
 
 @app.get("/")
 async def home():
@@ -40,11 +40,9 @@ async def home():
 @app.post("/stylize")
 async def stylize(content_image: UploadFile = File(...), style_image: UploadFile = File(...)):
     try:
-        # Read images from request
+        # Read and validate images from request
         content_image_data = await content_image.read()
         style_image_data = await style_image.read()
-
-        # Check if both images are provided
         if not content_image_data or not style_image_data:
             raise HTTPException(status_code=400, detail="Both content_image and style_image must be provided.")
 
@@ -62,7 +60,6 @@ async def stylize(content_image: UploadFile = File(...), style_image: UploadFile
         # Convert image to base64 format
         buf = io.BytesIO()
         stylized_image.save(buf, format="PNG")
-        buf.seek(0)
         img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
         # Return the base64-encoded image in JSON response
