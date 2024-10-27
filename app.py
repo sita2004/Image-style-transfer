@@ -28,7 +28,7 @@ def load_and_process_image(image_data, image_size=(256, 256)):
     img = Image.open(io.BytesIO(image_data))
     if img.mode != 'RGB':
         img = img.convert('RGB')
-    img = img.resize(image_size, Image.ANTIALIAS)  # Efficient resizing
+    img = img.resize(image_size, Image.LANCZOS)  # Use LANCZOS instead of ANTIALIAS
     img = np.array(img) / 255.0  # Normalize to [0, 1]
     img_tensor = tf.convert_to_tensor(img, dtype=tf.float32)
     return tf.expand_dims(img_tensor, 0)
