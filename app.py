@@ -1,18 +1,29 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
 from PIL import Image
 import io
+import base64
 
 app = FastAPI()
+
+# Add CORS middleware to allow requests from the frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://image-style-transfer-frontend.onrender.com"],  # Add your frontend URL here
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Load the TensorFlow Hub model
 hub_handle = 'https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2'
 hub_module = hub.load(hub_handle)
 
-# Process and load image data
+# Function to load and process image data
 def load_and_process_image(image_data, image_size=(256, 256)):
     img = Image.open(io.BytesIO(image_data))
     if img.mode != 'RGB':
@@ -48,13 +59,14 @@ async def stylize(content_image: UploadFile = File(...), style_image: UploadFile
         stylized_image = np.squeeze(stylized_image) * 255
         stylized_image = Image.fromarray(np.uint8(stylized_image))
 
-        # Save image to a byte buffer
+        # Convert image to base64 format
         buf = io.BytesIO()
         stylized_image.save(buf, format="PNG")
         buf.seek(0)
+        img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-        # Return the image as a streaming response
-        return StreamingResponse(buf, media_type="image/png")
+        # Return the base64-encoded image in JSON response
+        return JSONResponse(content={"stylized_image": img_base64})
 
     except HTTPException as e:
         raise e
